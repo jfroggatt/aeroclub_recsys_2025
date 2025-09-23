@@ -1,9 +1,10 @@
 import numpy as np
 import polars as pl
-from sklearn.cluster import AgglomerativeClustering
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics import silhouette_score
 from sklearn.metrics.pairwise import euclidean_distances
+from sklearn.cluster import DBSCAN, AgglomerativeClustering
+from sklearn.mixture import GaussianMixture
 
 
 def remove_outliers(df, contamination=0.05):
@@ -97,6 +98,95 @@ def encode_features(df, saved_encoders=None, save_encoders=False):
     return final_df.fill_null(0), encoders
 
 
+def alternative_clustering_methods(features):
+    """Try different clustering algorithms"""
+
+    results = {}
+
+    # 1. Gaussian Mixture Models
+    print("Testing Gaussian Mixture Models...")
+    best_gmm_score = -1
+    best_gmm_n = 0
+
+    for n_clusters in [15, 20, 25, 30, 35, 40]:
+        gmm = GaussianMixture(n_components=n_clusters, random_state=42, covariance_type='full')
+        labels = gmm.fit_predict(features)
+
+        if len(set(labels)) > 1:  # Ensure we have multiple clusters
+            score = silhouette_score(features, labels)
+            if score > best_gmm_score:
+                best_gmm_score = score
+                best_gmm_n = n_clusters
+
+    # Fit best GMM
+    best_gmm = GaussianMixture(n_components=best_gmm_n, random_state=42, covariance_type='full')
+    gmm_labels = best_gmm.fit_predict(features)
+    results['gmm'] = {
+        'labels': gmm_labels,
+        'silhouette': silhouette_score(features, gmm_labels),
+        'n_clusters': len(set(gmm_labels))
+    }
+
+    # 2. DBSCAN
+    print("Testing DBSCAN...")
+    # Test different eps values
+    best_dbscan_score = -1
+    best_dbscan_eps = 0
+
+    for eps in [0.3, 0.5, 0.7, 1.0, 1.5]:
+        dbscan = DBSCAN(eps=eps, min_samples=50)
+        labels = dbscan.fit_predict(features)
+
+        # More realistic condition: at least 2 clusters, allow some noise
+        n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+        n_noise = list(labels).count(-1)
+        noise_ratio = n_noise / len(labels)
+
+        if n_clusters >= 2 and noise_ratio < 0.9:  # At least 2 clusters, <90% noise
+            # Exclude noise points from silhouette calculation
+            non_noise_mask = labels != -1
+            if non_noise_mask.sum() > 0:
+                score = silhouette_score(features[non_noise_mask], labels[non_noise_mask])
+                print(f"eps: {eps:.2f} | Clusters: {n_clusters} | Noise: {noise_ratio:.2%} | Silhouette: {score:.4f}")
+
+                if score > best_dbscan_score:
+                    best_dbscan_score = score
+                    best_dbscan_eps = eps
+
+    if best_dbscan_eps > 0:
+        best_dbscan = DBSCAN(eps=best_dbscan_eps, min_samples=50)
+        dbscan_labels = best_dbscan.fit_predict(features)
+        results['dbscan'] = {
+            'labels': dbscan_labels,
+            'silhouette': silhouette_score(features, dbscan_labels),
+            'n_clusters': len(set(dbscan_labels)) - (1 if -1 in dbscan_labels else 0)
+        }
+
+    # 3. Agglomerative Clustering
+    print("Testing Agglomerative Clustering...")
+    best_agg_score = -1
+    best_agg_n = 0
+
+    for n_clusters in [10, 15, 20, 25, 30, 35]:
+        agg = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward')
+        labels = agg.fit_predict(features)
+
+        score = silhouette_score(features, labels)
+        if score > best_agg_score:
+            best_agg_score = score
+            best_agg_n = n_clusters
+
+    best_agg = AgglomerativeClustering(n_clusters=best_agg_n, linkage='ward')
+    agg_labels = best_agg.fit_predict(features)
+    results['agglomerative'] = {
+        'labels': agg_labels,
+        'silhouette': silhouette_score(features, agg_labels),
+        'n_clusters': len(set(agg_labels))
+    }
+
+    return results
+
+
 def generate_clusters(features, n_clusters=10):
     agg = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward')
     labels = agg.fit_predict(features)
@@ -127,23 +217,43 @@ def gen_optimum_num_clusters(features):
     best_agg_n = 0
     best_centroids = None
 
-    for n_clusters in [9, 10, 11, 12, 13, 14, 15, 16, 17]:
-        agg = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward')
-        labels = agg.fit_predict(features)
+    # Tuning combinations to try
+    linkage_methods = ['ward', 'complete', 'average']
+    metrics = {
+        'ward': ['euclidean'],  # ward only works with euclidean
+        'complete': ['euclidean', 'manhattan', 'cosine'],
+        'average': ['euclidean', 'manhattan', 'cosine']
+    }
+    max_clusters = 20
 
-        score = silhouette_score(features, labels)
-        if score > best_agg_score:
-            best_agg_score = score
-            best_agg_n = n_clusters
+    for linkage in linkage_methods:
+        for metric in metrics[linkage]:
+            for n_clusters in range(2, max_clusters + 1):
+                try:
+                    agg = AgglomerativeClustering(
+                        n_clusters=n_clusters,
+                        linkage=linkage,
+                        metric=metric
+                    )
+                    labels = agg.fit_predict(features)
 
-            # Create pseudo-centroids for use in prediction, since AgglomerativeClustering doesn't have centroids
-            unique_segments = np.unique(labels)
-            centroids = []
-            for segment_id in unique_segments:
-                segment_mask = labels == segment_id
-                centroid = features[segment_mask].mean(axis=0)
-                centroids.append(centroid)
-            best_centroids = np.array(centroids)
+                    # Calculate silhouette score
+                    score = silhouette_score(features, labels)
+                    if score > best_agg_score:
+                        best_agg_score = score
+                        best_agg_n = n_clusters
+
+                        # Create pseudo-centroids for use in prediction, since AgglomerativeClustering doesn't have centroids
+                        unique_segments = np.unique(labels)
+                        centroids = []
+                        for segment_id in unique_segments:
+                            segment_mask = labels == segment_id
+                            centroid = features[segment_mask].mean(axis=0)
+                            centroids.append(centroid)
+                        best_centroids = np.array(centroids)
+
+                except Exception as e:
+                    print(f"Error with n_clusters={n_clusters}, linkage={linkage}, metric={metric}: {e}")
 
     best_agg = AgglomerativeClustering(n_clusters=best_agg_n, linkage='ward')
     agg_labels = best_agg.fit_predict(features)
