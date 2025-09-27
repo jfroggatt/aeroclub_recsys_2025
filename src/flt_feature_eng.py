@@ -200,7 +200,7 @@ def create_window_based_flight_features(lazy_df: pl.LazyFrame) -> pl.LazyFrame:
 def create_derived_flight_features() -> List[pl.Expr]:
     return [
         pl.col('leg0_departure_hour').is_between(6, 22).cast(pl.Int8).alias('is_daytime'),
-        (pl.col('leg1_departure_weekday') >= 5).cast(pl.Int8).alias('is_weekend'),
+        (pl.col('leg0_departure_weekday') >= 5).cast(pl.Int8).alias('is_weekend'),
         (pl.col('leg0_departure_hour').is_between(6, 22) &
          (~pl.col('leg0_arrival_hour').is_between(6, 22)))
         .cast(pl.Int8).alias('is_redeye'),
@@ -250,8 +250,16 @@ def interactive_features()  -> List[pl.Expr]:
     return [
         (pl.col('is_daytime') * (1.0 - pl.col('night_flight_preference').fill_null(0.5))).alias('daytime_alignment'),
         (pl.col('is_weekend') * pl.col('weekend_travel_rate').fill_null(0.5)).alias('weekend_alignment'),
+        (pl.col('leg0_departure_weekday') == pl.col('weekday_preference')).cast(pl.Int8)
+            .alias('departure_weekday_match'),
+        (pl.col('leg1_departure_weekday') == pl.col('return_weekday_preference')).cast(pl.Int8)
+            .alias('return_departure_weekday_match'),
+        (pl.col('is_redeye') * pl.col('redeye_flight_preference').fill_null(0.5)).alias('redeye_alignment'),
         (pl.col('price_rank_pct') * pl.col('price_position_preference').fill_null(0.5)).alias('price_preference_match'),
         (pl.col('primary_carrier') == pl.col('most_common_carrier').fill_null('unknown')).cast(pl.Int8).alias('carrier_loyalty_match'),
+        pl.col('frequent_flyer')
+            .str.contains(pl.col('primary_carrier').fill_null(False))
+            .cast(pl.Int8).alias('carrier_ff_match')
     ]
 
 def prepare_combined_data(flight_features, cust_features):

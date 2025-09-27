@@ -107,6 +107,7 @@ def alternative_clustering_methods(features):
     print("Testing Gaussian Mixture Models...")
     best_gmm_score = -1
     best_gmm_n = 0
+    best_gmm_labels = np.array([])
 
     for n_clusters in [15, 20, 25, 30, 35, 40]:
         gmm = GaussianMixture(n_components=n_clusters, random_state=42, covariance_type='full')
@@ -117,14 +118,13 @@ def alternative_clustering_methods(features):
             if score > best_gmm_score:
                 best_gmm_score = score
                 best_gmm_n = n_clusters
+                best_gmm_labels = labels
 
-    # Fit best GMM
-    best_gmm = GaussianMixture(n_components=best_gmm_n, random_state=42, covariance_type='full')
-    gmm_labels = best_gmm.fit_predict(features)
+    # Save best results
     results['gmm'] = {
-        'labels': gmm_labels,
-        'silhouette': silhouette_score(features, gmm_labels),
-        'n_clusters': len(set(gmm_labels))
+        'labels': best_gmm_labels,
+        'silhouette': best_gmm_score,
+        'n_clusters': best_gmm_n
     }
 
     # 2. DBSCAN
@@ -132,6 +132,8 @@ def alternative_clustering_methods(features):
     # Test different eps values
     best_dbscan_score = -1
     best_dbscan_eps = 0
+    best_dbscan_labels = np.array([])
+    best_dbscan_n = 0
 
     for eps in [0.3, 0.5, 0.7, 1.0, 1.5]:
         dbscan = DBSCAN(eps=eps, min_samples=50)
@@ -145,27 +147,31 @@ def alternative_clustering_methods(features):
         if n_clusters >= 2 and noise_ratio < 0.9:  # At least 2 clusters, <90% noise
             # Exclude noise points from silhouette calculation
             non_noise_mask = labels != -1
-            if non_noise_mask.sum() > 0:
+            if np.sum(non_noise_mask) > 0:
                 score = silhouette_score(features[non_noise_mask], labels[non_noise_mask])
                 print(f"eps: {eps:.2f} | Clusters: {n_clusters} | Noise: {noise_ratio:.2%} | Silhouette: {score:.4f}")
+            else:
+                score = silhouette_score(features, labels)
 
-                if score > best_dbscan_score:
-                    best_dbscan_score = score
-                    best_dbscan_eps = eps
+            if score > best_dbscan_score:
+                best_dbscan_score = score
+                best_dbscan_eps = eps
+                best_dbscan_n = n_clusters
+                best_dbscan_labels = labels
 
     if best_dbscan_eps > 0:
-        best_dbscan = DBSCAN(eps=best_dbscan_eps, min_samples=50)
-        dbscan_labels = best_dbscan.fit_predict(features)
         results['dbscan'] = {
-            'labels': dbscan_labels,
-            'silhouette': silhouette_score(features, dbscan_labels),
-            'n_clusters': len(set(dbscan_labels)) - (1 if -1 in dbscan_labels else 0)
+            'labels': best_dbscan_labels,
+            'silhouette': best_dbscan_score,
+            'n_clusters': best_dbscan_n,
+            'eps': best_dbscan_eps,
         }
 
     # 3. Agglomerative Clustering
     print("Testing Agglomerative Clustering...")
     best_agg_score = -1
     best_agg_n = 0
+    best_agg_labels = np.array([])
 
     for n_clusters in [10, 15, 20, 25, 30, 35]:
         agg = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward')
@@ -175,20 +181,19 @@ def alternative_clustering_methods(features):
         if score > best_agg_score:
             best_agg_score = score
             best_agg_n = n_clusters
+            best_agg_labels = labels
 
-    best_agg = AgglomerativeClustering(n_clusters=best_agg_n, linkage='ward')
-    agg_labels = best_agg.fit_predict(features)
     results['agglomerative'] = {
-        'labels': agg_labels,
-        'silhouette': silhouette_score(features, agg_labels),
-        'n_clusters': len(set(agg_labels))
+        'labels': best_agg_labels,
+        'silhouette': best_agg_score,
+        'n_clusters': best_agg_n
     }
 
     return results
 
 
-def generate_clusters(features, n_clusters=10):
-    agg = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward')
+def generate_clusters(features, n_clusters=10, linkage='ward', metric='euclidean'):
+    agg = AgglomerativeClustering(n_clusters=n_clusters, linkage=linkage, metric=metric)
     labels = agg.fit_predict(features)
 
     # Create pseudo-centroids for use in prediction, since AgglomerativeClustering doesn't have centroids
@@ -212,10 +217,12 @@ def generate_clusters(features, n_clusters=10):
     }
 
 
-def gen_optimum_num_clusters(features):
+def gen_optimum_num_clusters(features, min_clusters=2, max_clusters=20, step=2):
     best_agg_score = -1
     best_agg_n = 0
     best_centroids = None
+    best_linkage = None
+    best_metric = None
 
     # Tuning combinations to try
     linkage_methods = ['ward', 'complete', 'average']
@@ -224,11 +231,10 @@ def gen_optimum_num_clusters(features):
         'complete': ['euclidean', 'manhattan', 'cosine'],
         'average': ['euclidean', 'manhattan', 'cosine']
     }
-    max_clusters = 20
 
     for linkage in linkage_methods:
         for metric in metrics[linkage]:
-            for n_clusters in range(2, max_clusters + 1):
+            for n_clusters in range(min_clusters, max_clusters + 1, step):
                 try:
                     agg = AgglomerativeClustering(
                         n_clusters=n_clusters,
@@ -239,9 +245,13 @@ def gen_optimum_num_clusters(features):
 
                     # Calculate silhouette score
                     score = silhouette_score(features, labels)
+
+                    print(f"n_clusters={n_clusters}, linkage={linkage}, metric={metric}: {score:.4f}")
                     if score > best_agg_score:
                         best_agg_score = score
                         best_agg_n = n_clusters
+                        best_linkage = linkage
+                        best_metric = metric
 
                         # Create pseudo-centroids for use in prediction, since AgglomerativeClustering doesn't have centroids
                         unique_segments = np.unique(labels)
@@ -255,7 +265,7 @@ def gen_optimum_num_clusters(features):
                 except Exception as e:
                     print(f"Error with n_clusters={n_clusters}, linkage={linkage}, metric={metric}: {e}")
 
-    best_agg = AgglomerativeClustering(n_clusters=best_agg_n, linkage='ward')
+    best_agg = AgglomerativeClustering(n_clusters=best_agg_n, linkage=best_linkage, metric=best_metric)
     agg_labels = best_agg.fit_predict(features)
 
     print(f"Best number of clusters: {best_agg_n}, with Silhouette score: {best_agg_score:.4f}")
@@ -306,16 +316,26 @@ def analyze_clusters(original_df, cluster_labels, outlier_indices=None):
             analysis_df = analysis_df.with_columns(pl.Series('cluster', cluster_labels))
 
             # Cluster profiling
-            print("\n📊 CLUSTER PROFILES:")
+            print("\nCLUSTER PROFILES:")
             print("=" * 50)
 
             cluster_profiles = analysis_df.group_by('cluster').agg([
-                pl.col('total_searches').mean().alias('avg_searches'),
+                pl.col('total_flights_searched').mean().alias('avg_flights_searched'),
                 pl.col('is_vip').mean().alias('vip_rate'),
                 pl.col('roundtrip_preference').mean().alias('roundtrip_rate'),
                 pl.col('avg_booking_lead_days').mean().alias('avg_lead_days'),
                 pl.col('unique_carriers_used').mean().alias('avg_carriers'),
+                pl.col('avg_cabin_class').mean().alias('avg_cabin_class'),
+                pl.col('loyalty_program_utilization').mean().alias('avg_loyalty_utilization'),
+                pl.col('price_position_preference').mean().alias('avg_price_position_preference'),
+                pl.col('preferred_price_tier').mean().alias('avg_preferred_price_tier'),
+                pl.col('connection_tolerance').mean().alias('avg_connection_tolerance'),
+                pl.col('weekend_travel_rate').mean().alias('avg_weekend_travel_rate'),
+                pl.col('night_flight_preference').mean().alias('avg_night_flight_preference'),
                 pl.len().alias('size')
-            ]).sort('cluster')
+            ]).sort('cluster').to_pandas()
 
-            print(cluster_profiles)
+            return cluster_profiles
+        return None
+    else:
+        return None
