@@ -28,7 +28,7 @@ def create_basic_features(col_groups: Dict[str, List[str]]) -> List[pl.Expr]:
         pl.col('isAccess3D').cast(pl.Int32).alias('is_access3D'),
 
         # Normalized frequentFlyer program, addressing null values as null strings, and translating UT program
-        pl.col('frequentFlyer').str.replace('- ЮТэйр ЗАО', 'UT').fill_null('').alias('frequent_flyer'),
+        # pl.col('frequentFlyer').str.replace('- ЮТэйр ЗАО', 'UT').fill_null('').alias('frequent_flyer'),
 
         # Route characteristics
         pl.col('legs1_departureAt').is_not_null().cast(pl.Int8).alias('is_roundtrip'),
@@ -37,9 +37,9 @@ def create_basic_features(col_groups: Dict[str, List[str]]) -> List[pl.Expr]:
         # Hub features
         pl.col('searchRoute').str.slice(0, 3).is_in(MAJOR_HUBS).cast(pl.Int32).alias('origin_is_major_hub'),
         pl.col('searchRoute').str.slice(3, 3).is_in(MAJOR_HUBS).cast(pl.Int32).alias('destination_is_major_hub'),
-        pl.max_horizontal([
-            pl.col(col).is_in(MAJOR_HUBS) for col in col_groups['airport']
-        ]).cast(pl.Int32).alias('includes_major_hub'),
+        # pl.max_horizontal([
+        #     pl.col(col).is_in(MAJOR_HUBS) for col in col_groups['airport']
+        # ]).cast(pl.Int32).alias('includes_major_hub'),
     ]
 
 
@@ -122,8 +122,8 @@ def create_carrier_features(col_groups: Dict[str, List[str]]) -> List[pl.Expr]:
         pl.col('legs0_segments0_marketingCarrier_code').alias('marketing_carrier'),
 
         # Frequent flyer matching (check if FF programs match carriers)
-        pl.max_horizontal(ff_matches_mkt).cast(pl.Int32).alias('has_mkt_ff'),
-        pl.max_horizontal(ff_matches_op).cast(pl.Int32).alias('has_op_ff'),
+        # pl.max_horizontal(ff_matches_mkt).cast(pl.Int32).alias('has_mkt_ff'),
+        # pl.max_horizontal(ff_matches_op).cast(pl.Int32).alias('has_op_ff'),
 
         # Aircraft features
         pl.concat_list([pl.col(col) for col in col_groups['aircraft']])
@@ -168,15 +168,6 @@ def create_service_features(col_groups: Dict[str, List[str]]) -> List[pl.Expr]:
     ]
 
 
-def add_route_popularity(lazy_df: pl.LazyFrame) -> pl.LazyFrame:
-    """Add search route popularity features."""
-    return lazy_df.with_columns([
-        pl.len().over('searchRoute').alias('route_popularity')
-    ]).with_columns([
-        pl.col('route_popularity').log1p().alias('route_popularity_log')
-    ])
-
-
 def create_window_based_flight_features(lazy_df: pl.LazyFrame) -> pl.LazyFrame:
     return lazy_df.with_columns([
         # calculate price percentile over search session
@@ -219,7 +210,7 @@ def extract_flight_features(df: pl.DataFrame) -> pl.DataFrame:
 
     # Start with lazy frame, dropping unnecessary columns
     lazy_df = df.drop(CUSTOMER_FEATURES + POLARS_INDEX_COL, strict=False).lazy()
-    lazy_df = create_window_based_flight_features(lazy_df)
+    # lazy_df = create_window_based_flight_features(lazy_df)
 
     # Apply all feature groups
     lazy_df = lazy_df.with_columns([
@@ -258,7 +249,7 @@ def interactive_features()  -> List[pl.Expr]:
         (pl.col('price_rank_pct') * pl.col('price_position_preference').fill_null(0.5)).alias('price_preference_match'),
         (pl.col('primary_carrier') == pl.col('most_common_carrier').fill_null('unknown')).cast(pl.Int8).alias('carrier_loyalty_match'),
         pl.col('frequent_flyer')
-            .str.contains(pl.col('primary_carrier').fill_null(False))
+            .str.contains(pl.col('marketing_carrier').fill_null(False))
             .cast(pl.Int8).alias('carrier_ff_match')
     ]
 
