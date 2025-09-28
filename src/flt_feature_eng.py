@@ -28,7 +28,7 @@ def create_basic_features(col_groups: Dict[str, List[str]]) -> List[pl.Expr]:
         pl.col('isAccess3D').cast(pl.Int32).alias('is_access3D'),
 
         # Normalized frequentFlyer program, addressing null values as null strings, and translating UT program
-        # pl.col('frequentFlyer').str.replace('- ЮТэйр ЗАО', 'UT').fill_null('').alias('frequent_flyer'),
+        pl.col('frequentFlyer').str.replace('- ЮТэйр ЗАО', 'UT').fill_null('').alias('frequent_flyer'),
 
         # Route characteristics
         pl.col('legs1_departureAt').is_not_null().cast(pl.Int8).alias('is_roundtrip'),
@@ -121,10 +121,6 @@ def create_carrier_features(col_groups: Dict[str, List[str]]) -> List[pl.Expr]:
         pl.coalesce([pl.col(col) for col in all_carrier_cols]).alias('primary_carrier'),
         pl.col('legs0_segments0_marketingCarrier_code').alias('marketing_carrier'),
 
-        # Frequent flyer matching (check if FF programs match carriers)
-        # pl.max_horizontal(ff_matches_mkt).cast(pl.Int32).alias('has_mkt_ff'),
-        # pl.max_horizontal(ff_matches_op).cast(pl.Int32).alias('has_op_ff'),
-
         # Aircraft features
         pl.concat_list([pl.col(col) for col in col_groups['aircraft']])
         .list.drop_nulls().list.unique().list.len().alias('aircraft_diversity'),
@@ -210,7 +206,6 @@ def extract_flight_features(df: pl.DataFrame) -> pl.DataFrame:
 
     # Start with lazy frame, dropping unnecessary columns
     lazy_df = df.drop(CUSTOMER_FEATURES + POLARS_INDEX_COL, strict=False).lazy()
-    # lazy_df = create_window_based_flight_features(lazy_df)
 
     # Apply all feature groups
     lazy_df = lazy_df.with_columns([
