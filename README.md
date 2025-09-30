@@ -38,6 +38,7 @@ Where:
 - [Running the Process on Test dataj](#running-the-process-on-test-data)
 - [Final Results](#final-results)
 - [Next Steps](#next-steps)
+- [Source Code](#source-code)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 - [References](#references)
@@ -333,6 +334,19 @@ Given that the customer segmentation did not meet expectations, the next steps a
 4. Determine if additional data exists or could be made available that would augment the existing data set, such as the order flight search results were presented to the customer or any indications whether they viewed the specific flight.
 5. Try additional unsupervised models
 6. Evaluate other methods for encoding, scaling, and dimensionality reduction of the customer features.
+
+## Source Code
+
+To facilitate the iterative process of the project and to keep the prjoect notebook within a reasonable size, the python source code is maintained in the `src` folder. The source code is organized into the following modules:
+* `cust_feature_eng.py` - contains the code for the customer feature engineering
+* `flight_feature_eng.py` - contains the code for the flight feature engineering
+* `cluster_cust_data.py` - contains the code for the customer segmentation
+* `ranking.py` - contains the code for the flight ranking
+* `ranking_eval.py` - contains the code to calculate the HitRate@3 metric and testing the ranking models
+* `utils.py` - contains the code for the utility functions
+* `constants.py` - contains the constants used in the project
+
+The steps using the functions are all performed within the Jupyter Notebook, `aeroclub_recsys_2025.ipynb`.
 
 ## License
 
