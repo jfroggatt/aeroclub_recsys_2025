@@ -298,28 +298,18 @@ Overall, the final results for the Test data achieved a HitRate@3 of 0.7744. Thi
 
 ### Customer Segmentation Results
 
-The customer segmentation did not achieve the results hope for. The segmentation for the model that provided the highest Silhoutte Score results as follows:
-
-**Train Data**
-
-| Segment | # of Search Sessions | # of Flights |
-| :------ | :------------------- | ------------ |
-| 0       | 74,673               | 12,313,885   |
-| 1       | 9                    | 2,002        |
-| 2       | 46                   | 13,441       |
-| 3       | 2                    | 978          |
-
+The customer segmentation did not achieve the desired results. The majority of customers fell into a single segment with three additional segments only encompassing 3% of the customer population. The segmentation results for the model that provided the highest Silhoutte Score:
 
 **Test Data**
 
-| Segment | # of Search Sessions | # of Flights |
-| :------ | :------------------- | ------------ |
-| 0       | 20,843               | 3,506,639    |
-| 1       | 36                   | 17,243       |
-| 2       | 197                  | 53,189       |
-| 3       | 34                   | 50,762       |
+| Segment | # of customers | avg search sessions | avg flights searched | % is vip |
+| :------ |:---------------|---------------------|----------------------|----------|
+| 0       | 13,671         | 1.52                | 256.50               | 2.51     |
+| 1       | 316            | 2.25                | 1,077.69             | 100.00   |
+| 2       | 90             | 2.19                | 590.99               | 100.00   |
+| 3       | 20             | 1.70                | 2,538.10             | 100.00   |
 
-The segmentation results for the Test data seemed to perform better than the Train data, but the difference was not significant. The number of search sessions for each segment was similar, but the number of flights per segment was significantly higher for the Test data. 
+The segmentation results for the Test data seemed to perform better than the Train data, but the difference was not significant. Looking through the clustering statistics, the features determining the separation is not clear. So, this will take additional evaluation to determine a better feature set, given that we used Principal Component Analysis (PCA) to reduce the dimensionality of the data.
 
 While the LightGBM model used the cluster segmentation for the flight ranking prediction, since the 'customer_segment' feature was left in the data, the training of segment-based models performed worse than the single general model across the board.
 
@@ -331,7 +321,7 @@ Given that the customer segmentation did not meet expectations, the next steps a
 1. Remove the 'customer_segment' feature from the training data set and rerun the process to evaluate the impact of the segmentation.
 2. Identify additional customer features that would provide additional insights for segmentation
 3. Identify additional interactive features between the customer and flight data that would improve behavioral or profile based matching.
-4. Determine if additional data exists or could be made available that would augment the existing data set, such as the order flight search results were presented to the customer or any indications whether they viewed the specific flight.
+4. Determine if additional data exists or could be made available that would augment the existing data set, such as the order flight search results were presented to the customer, any indications whether the customer viewed the specific flight, or search parameters used to generate the search results.
 5. Try additional unsupervised models
 6. Evaluate other methods for encoding, scaling, and dimensionality reduction of the customer features.
 
