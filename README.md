@@ -54,12 +54,23 @@ git clone https://github.com/jfroggatt/aeroclub_recsys_2025
 cd aeroclub_recsys_2025
 ```
 ### 2. Create a Virtual Environment (Optional but Recommended)
+Using uv
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install uv
+uv venv --python=python3.12 .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+Using pip
+```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 ### 3. Install Dependencies
-Install all required packages from `requirements.txt`:
+Install all required packages from `pyproject.toml` for uv:
+```bash
+uv sync
+```
+Install all required packages from `requirements.txt` for pip:
 ```bash
 pip install -r requirements.txt
 ```
@@ -72,7 +83,7 @@ Then open the `aeroclub_recsys.ipynb` file from the Jupyter interface.
 ## Requirements
 -  Python 3.12
 -  Jupyter Notebook
--  See `requirements.txt` for the full list
+-  See `requirements.txt` or `pyproject.toml` for the full list
 
 ## Usage
 -  Run each cell in sequence
