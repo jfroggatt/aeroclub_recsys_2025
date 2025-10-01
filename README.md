@@ -361,4 +361,4 @@ Anthropic. (2025). *Claude Sonnet 4* (May 22, 2025) [Large Language Model] https
  - the LLM used by PyCharm JetBrains AI for code assist and troubleshooting
 
 ## Video Overview
-A video overview of the project can be accessed on YouTube: [CSCA-5622 Final Project](https://youtu.be/ZtnP777eYj8)
+A video overview of the project can be accessed on YouTube: [CSCA-5632 Final Project](https://youtu.be/whnV6eRDqjc)
